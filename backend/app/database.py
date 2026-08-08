@@ -1,17 +1,14 @@
 from typing import Optional
-# pyrefly: ignore [missing-import]
-from mongomock_motor import AsyncMongoMockClient
-# pyrefly: ignore [missing-import]
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from app.config import settings
 
-client: Optional[AsyncMongoMockClient] = None
+client: Optional[AsyncIOMotorClient] = None
 db: Optional[AsyncIOMotorDatabase] = None
 
 
 async def connect_db():
     global client, db
-    client = AsyncMongoMockClient()
+    client = AsyncIOMotorClient(settings.MONGODB_URI)
     assert client is not None
     db = client[settings.DATABASE_NAME]
     assert db is not None

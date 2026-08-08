@@ -4,59 +4,120 @@ from datetime import datetime
 
 
 async def seed_data():
-    """Seed demo entities and users. Idempotent — skips if data already exists."""
+    """Seed demo entities and users safely."""
+
     db = get_db()
 
-    # Check if already seeded
-    existing_entities = await db.entities.count_documents({})
-    if existing_entities > 0:
-        print("Database already seeded, skipping...")
-        return
+    print("Checking demo data...")
 
-    print("Seeding demo data...")
+    # ---------------------------------------------------------
+    # 1. Create entities if they don't already exist
+    # ---------------------------------------------------------
 
-    # Create entities
-    abc_result = await db.entities.insert_one(
-        {"name": "ABC Technologies", "created_at": datetime.utcnow()}
-    )
-    xyz_result = await db.entities.insert_one(
-        {"name": "XYZ Solutions", "created_at": datetime.utcnow()}
+    abc_entity = await db.entities.find_one(
+        {"name": "ABC Technologies"}
     )
 
-    abc_id = abc_result.inserted_id
-    xyz_id = xyz_result.inserted_id
+    if not abc_entity:
+        abc_result = await db.entities.insert_one(
+            {
+                "name": "ABC Technologies",
+                "created_at": datetime.utcnow(),
+            }
+        )
+        abc_id = abc_result.inserted_id
+        print("Created entity: ABC Technologies")
+    else:
+        abc_id = abc_entity["_id"]
+        print("Entity already exists: ABC Technologies")
 
-    # Create users
-    users = [
+    xyz_entity = await db.entities.find_one(
+        {"name": "XYZ Solutions"}
+    )
+
+    if not xyz_entity:
+        xyz_result = await db.entities.insert_one(
+            {
+                "name": "XYZ Solutions",
+                "created_at": datetime.utcnow(),
+            }
+        )
+        xyz_id = xyz_result.inserted_id
+        print("Created entity: XYZ Solutions")
+    else:
+        xyz_id = xyz_entity["_id"]
+        print("Entity already exists: XYZ Solutions")
+
+    # ---------------------------------------------------------
+    # 2. Create demo users if they don't already exist
+    # ---------------------------------------------------------
+
+    demo_users = [
         {
             "name": "Reception Desk",
             "email": "reception@demo.com",
-            "password_hash": hash_password("Reception@123"),
+            "password": "Reception@123",
             "role": "receptionist",
             "entity_id": None,
-            "created_at": datetime.utcnow(),
         },
         {
             "name": "Amit Kumar",
             "email": "amit@demo.com",
-            "password_hash": hash_password("Employee@123"),
+            "password": "Employee@123",
             "role": "employee",
             "entity_id": abc_id,
-            "created_at": datetime.utcnow(),
         },
         {
             "name": "Rahul Sharma",
             "email": "rahul@demo.com",
-            "password_hash": hash_password("Employee@123"),
+            "password": "Employee@123",
             "role": "employee",
             "entity_id": xyz_id,
-            "created_at": datetime.utcnow(),
         },
     ]
 
-    await db.users.insert_many(users)
+    created_users = 0
 
-    print(f"Seeded 2 entities and {len(users)} users:")
-    print(f"  - reception@demo.com / Reception@123 (Receptionist)")
-    print(f"  - amit@demo.com / Employee@123 (Employee @ ABC Technologies)")
-    print(f"  - rahul@demo.com / Employee@123 (Employee @ XYZ Solutions)")
+    for user_data in demo_users:
+
+        existing_user = await db.users.find_one(
+            {"email": user_data["email"]}
+        )
+
+        if existing_user:
+            print(f"User already exists: {user_data['email']}")
+            continue
+
+        user = {
+            "name": user_data["name"],
+            "email": user_data["email"],
+            "password_hash": hash_password(
+                user_data["password"]
+            ),
+            "role": user_data["role"],
+            "entity_id": user_data["entity_id"],
+            "created_at": datetime.utcnow(),
+        }
+
+        await db.users.insert_one(user)
+
+        created_users += 1
+
+        print(f"Created user: {user_data['email']}")
+
+    # ---------------------------------------------------------
+    # 3. Summary
+    # ---------------------------------------------------------
+
+    total_entities = await db.entities.count_documents({})
+    total_users = await db.users.count_documents({})
+
+    print("\nDemo data check completed.")
+    print(f"Total entities: {total_entities}")
+    print(f"Total users: {total_users}")
+    print(f"New users created: {created_users}")
+
+    print("\nDemo credentials:")
+    print("Receptionist: reception@demo.com / Reception@123")
+    print("Employee:     amit@demo.com / Employee@123")
+    print("Employee:     rahul@demo.com / Employee@123")
